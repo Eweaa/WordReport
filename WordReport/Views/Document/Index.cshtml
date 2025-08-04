@@ -1,0 +1,80 @@
+﻿@using WordReport.ViewModels
+
+<style>
+    .item-group {
+        margin-bottom: 10px;
+    }
+
+    .item-group input {
+        margin-right: 5px;
+    }
+
+    .item-group button {
+        background-color: red;
+        color: white;
+        border: none;
+        padding: 4px 8px;
+        cursor: pointer;
+    }
+</style>
+
+
+
+@model DocumentViewModel
+
+<form asp-action="GenerateWord" method="post">
+    <div>
+        <label>Title:</label>
+        <input type="text" name="Title" class="form-control" />
+    </div>
+    <div>
+        <label>Date:</label>
+        <input type="text" name="Date" class="form-control" />
+    </div>
+
+    <hr />
+    <h4>Table Items</h4>
+
+    <div id="tableItems">
+        <!-- Dynamic rows will be inserted here -->
+    </div>
+
+    <button type="button" onclick="addRow()">Add Row</button>
+
+    <hr />
+    <button type="submit">Generate Word</button>
+</form>
+
+@section Scripts {
+    <script>
+        let rowIndex = 0;
+
+        function addRow(name = '', quantity = '', price = '') {
+            const container = document.getElementById("tableItems");
+
+            const row = document.createElement("div");
+            row.classList.add("item-group");
+            row.dataset.index = rowIndex;
+
+            row.innerHTML = `
+                <input type="text" name="Items[${rowIndex}].Name" placeholder="Name" value="${name}" />
+                <input type="number" name="Items[${rowIndex}].Quantity" placeholder="Quantity" value="${quantity}" />
+                <button type="button" onclick="removeRow(this)">Remove</button>
+            `;
+
+            container.appendChild(row);
+            rowIndex++;
+        }
+
+        function removeRow(button) {
+            const row = button.parentNode;
+            row.remove();
+            // Optionally, renumber indexes after deletion, or leave gaps — ASP.NET Core can handle it.
+        }
+
+        // Add one default row on page load
+        document.addEventListener("DOMContentLoaded", function () {
+            addRow();
+        });
+    </script>
+}

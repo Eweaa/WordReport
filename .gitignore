@@ -1,0 +1,4 @@
+*.bin
+/WordReport/obj
+/.vs
+/WordReport/bin
