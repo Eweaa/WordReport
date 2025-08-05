@@ -1,28 +1,31 @@
 ﻿@using WordReport.ViewModels
+@model DocumentViewModel
 
 <style>
     .item-group {
         margin-bottom: 10px;
     }
 
-    .item-group input {
-        margin-right: 5px;
-    }
+        .item-group input {
+            margin-right: 5px;
+        }
 
-    .item-group button {
-        background-color: red;
-        color: white;
-        border: none;
-        padding: 4px 8px;
-        cursor: pointer;
+        .item-group button {
+            background-color: red;
+            color: white;
+            border: none;
+            padding: 4px 8px;
+            cursor: pointer;
+        }
+
+    .table-group {
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-bottom: 20px;
     }
 </style>
 
-
-
-@model DocumentViewModel
-
-<form asp-action="GenerateWord" method="post">
+<form asp-action="GenerateWord" method="post" enctype="multipart/form-data">
     <div>
         <label>Title:</label>
         <input type="text" name="Title" class="form-control" />
@@ -31,50 +34,82 @@
         <label>Date:</label>
         <input type="text" name="Date" class="form-control" />
     </div>
-
-    <hr />
-    <h4>Table Items</h4>
-
-    <div id="tableItems">
-        <!-- Dynamic rows will be inserted here -->
+    <div>
+        <label>Logo:</label>
+        <input type="file" name="Logo" class="form-control" accept="image/*" />
+        <small class="form-text text-muted">Select an image file for the logo (JPG, PNG, GIF, BMP)</small>
     </div>
 
-    <button type="button" onclick="addRow()">Add Row</button>
+    <hr />
+    <h4>Tables</h4>
+    <div id="tableGroups">
+        <!-- Dynamic table groups will be inserted here -->
+    </div>
 
+    <button type="button" onclick="addTableGroup()">Add Table</button>
     <hr />
     <button type="submit">Generate Word</button>
 </form>
 
 @section Scripts {
     <script>
-        let rowIndex = 0;
+        let tableIndex = 0;
 
-        function addRow(name = '', quantity = '', price = '') {
-            const container = document.getElementById("tableItems");
+        function addTableGroup() {
+            const groupContainer = document.getElementById("tableGroups");
 
-            const row = document.createElement("div");
-            row.classList.add("item-group");
-            row.dataset.index = rowIndex;
+            const groupDiv = document.createElement("div");
+            groupDiv.classList.add("table-group");
+            groupDiv.dataset.tableIndex = tableIndex;
 
-            row.innerHTML = `
-                <input type="text" name="Items[${rowIndex}].Name" placeholder="Name" value="${name}" />
-                <input type="number" name="Items[${rowIndex}].Quantity" placeholder="Quantity" value="${quantity}" />
+            groupDiv.innerHTML = `
+                <div>
+                    <label>Placeholder for this table (e.g., Items1):</label>
+                    <input type="text" name="Tables[${tableIndex}].Key" class="form-control" />
+                </div>
+                <div id="items-${tableIndex}">
+                    <!-- Rows will go here -->
+                </div>
+                <button type="button" onclick="addItemRow(${tableIndex})">Add Row</button>
+                <button type="button" onclick="removeTableGroup(this)">Remove Table</button>
+                <hr />
+            `;
+
+            groupContainer.appendChild(groupDiv);
+            addItemRow(tableIndex); // Add one default row
+
+            tableIndex++;
+        }
+
+        function addItemRow(tableIdx, name = '', quantity = '') {
+            const container = document.getElementById(`items-${tableIdx}`);
+            const itemCount = container.querySelectorAll('.item-group').length;
+
+            const itemDiv = document.createElement("div");
+            itemDiv.classList.add("item-group");
+
+            itemDiv.innerHTML = `
+                <input type="text" name="Tables[${tableIdx}].Items[${itemCount}].Name" placeholder="Name" value="${name}" />
+                <input type="number" name="Tables[${tableIdx}].Items[${itemCount}].Quantity" placeholder="Quantity" value="${quantity}" />
                 <button type="button" onclick="removeRow(this)">Remove</button>
             `;
 
-            container.appendChild(row);
-            rowIndex++;
+            container.appendChild(itemDiv);
         }
 
         function removeRow(button) {
             const row = button.parentNode;
             row.remove();
-            // Optionally, renumber indexes after deletion, or leave gaps — ASP.NET Core can handle it.
         }
 
-        // Add one default row on page load
+        function removeTableGroup(button) {
+            const groupDiv = button.closest('.table-group');
+            groupDiv.remove();
+        }
+
+        // Add one default table on page load
         document.addEventListener("DOMContentLoaded", function () {
-            addRow();
+            addTableGroup();
         });
     </script>
 }

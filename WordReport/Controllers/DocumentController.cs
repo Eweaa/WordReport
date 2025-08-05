@@ -8,11 +8,13 @@ public class DocumentController : Controller
 {
     private readonly IWebHostEnvironment _env;
     private readonly WordService _wordService;
+    private readonly DirectWordXmlService _wordXmlService;
 
     public DocumentController(IWebHostEnvironment env)
     {
         _env = env;
         _wordService = new WordService();
+        _wordXmlService = new DirectWordXmlService();
     }
 
     public IActionResult Index()
@@ -26,6 +28,7 @@ public class DocumentController : Controller
         string templatePath = Path.Combine(_env.WebRootPath, "templates", "Report.docx");
 
         var wordBytes = _wordService.GenerateDocument(model, templatePath);
+        //var wordBytes2 = _wordXmlService.GenerateDocumentManual(model, templatePath);
 
         return File(wordBytes, "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "Generated.docx");
     }
