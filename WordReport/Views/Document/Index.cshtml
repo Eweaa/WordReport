@@ -11,7 +11,7 @@
         }
 
         .item-group button {
-            background-color: red;
+            /* background-color: red; */
             color: white;
             border: none;
             padding: 4px 8px;
@@ -46,9 +46,9 @@
         <!-- Dynamic table groups will be inserted here -->
     </div>
 
-    <button type="button" onclick="addTableGroup()">Add Table</button>
+    <button type="button" onclick="addTableGroup()" class="btn btn-primary">Add Table</button>
     <hr />
-    <button type="submit">Generate Word</button>
+    <button type="submit" class="btn btn-success">Generate Word</button>
 </form>
 
 @section Scripts {
@@ -65,13 +65,13 @@
             groupDiv.innerHTML = `
                 <div>
                     <label>Placeholder for this table (e.g., Items1):</label>
-                    <input type="text" name="Tables[${tableIndex}].Key" class="form-control" />
+                    <input type="text" name="Tables[${tableIndex}].Key" class="form-control mb-4" />
                 </div>
                 <div id="items-${tableIndex}">
                     <!-- Rows will go here -->
                 </div>
-                <button type="button" onclick="addItemRow(${tableIndex})">Add Row</button>
-                <button type="button" onclick="removeTableGroup(this)">Remove Table</button>
+                <button type="button" onclick="addItemRow(${tableIndex})" class="btn btn-primary">Add Row</button>
+                <button type="button" onclick="removeTableGroup(this)" class="btn btn-danger">Remove Table</button>
                 <hr />
             `;
 
@@ -91,7 +91,7 @@
             itemDiv.innerHTML = `
                 <input type="text" name="Tables[${tableIdx}].Items[${itemCount}].Name" placeholder="Name" value="${name}" />
                 <input type="number" name="Tables[${tableIdx}].Items[${itemCount}].Quantity" placeholder="Quantity" value="${quantity}" />
-                <button type="button" onclick="removeRow(this)">Remove</button>
+                <button type="button" onclick="removeRow(this)" class="btn btn-danger">Remove</button>
             `;
 
             container.appendChild(itemDiv);

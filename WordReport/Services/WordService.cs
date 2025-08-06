@@ -6,6 +6,7 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
 using System.Drawing;
 using System.IO.Compression;
+using WordReport.Models;
 using WordReport.ViewModels;
 using A = DocumentFormat.OpenXml.Drawing;
 using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
@@ -18,6 +19,46 @@ public class WordService
 {
     public byte[] GenerateDocument(DocumentViewModel model, string templatePath)
     {
+        var products = new List<Product>
+        {
+            new Product
+            {
+                ProductId = 1,
+                NameEn = "Laptop",
+                NameAr = "حاسوب محمول",
+                Description = "A powerful laptop for work.",
+                Category = "Electronics",
+                Price = 1500,
+                PriceAfterDiscount = 1200,
+                QuantityInStock = 10,
+                ExpiryDate = null
+            },
+            new Product
+            {
+                ProductId = 2,
+                NameEn = "Smartphone",
+                NameAr = "هاتف ذكي",
+                Description = "Latest smartphone model.",
+                Category = "Electronics",
+                Price = 900,
+                PriceAfterDiscount = 800,
+                QuantityInStock = 25,
+                ExpiryDate = null
+            },
+            new Product
+            {
+                ProductId = 3,
+                NameEn = "Milk",
+                NameAr = "حليب",
+                Description = "Organic milk 1L",
+                Category = "Groceries",
+                Price = 2.5m,
+                PriceAfterDiscount = 2.0m,
+                QuantityInStock = 100,
+                ExpiryDate = DateTime.Now.AddDays(10)
+            }
+        };
+
         byte[] byteArray = File.ReadAllBytes(templatePath);
 
         using (MemoryStream mem = new MemoryStream())
@@ -52,7 +93,8 @@ public class WordService
                 }
 
                 // Add rows to the table
-                AddTableRows(wordDoc.MainDocumentPart.Document.Body, model.Tables);
+                AddTableRows(wordDoc.MainDocumentPart.Document.Body, products);
+
                 wordDoc.MainDocumentPart.Document.Save();
 
 
@@ -74,11 +116,14 @@ public class WordService
     {
         foreach (var text in element.Descendants<W.Text>())
         {
+            if (text.Ancestors<W.Table>().Any())
+                continue;
+
             foreach (var key in placeholders.Keys)
             {
                 if (text.Text.Contains(key))
                 {
-                    text.Text = text.Text.Replace(key, placeholders[key]);
+                    text.Text = text.Text.Replace(key, placeholders[key], StringComparison.OrdinalIgnoreCase);
                 }
             }
         }
@@ -233,37 +278,49 @@ public class WordService
         }
     }
 
-    private void AddTableRows(W.Body body, List<TableItemGroupViewModel> groups)
+    private void AddTableRows<T>(W.Body body, List<T> items)
     {
-        if (groups == null || groups.Count == 0) return;
+        if (items == null || items.Count == 0) return;
 
-        var tables = body.Descendants<W.Table>().ToList();
+        var table = body.Descendants<W.Table>().FirstOrDefault();
+        if (table == null) return;
 
-        foreach (var group in groups)
+        var rows = table.Elements<W.TableRow>().ToList();
+        if (rows.Count < 2) return;
+
+        var labelRow = rows[0]; // First row (display names)
+        var propertyRow = rows[1]; // Second row (property names)
+
+        // Get property names from the second row
+        var propertyNames = propertyRow.Elements<W.TableCell>()
+            .Select(cell => cell.InnerText.Trim())
+            .ToList();
+
+        // Map property names to actual Product properties
+        var productType = typeof(Product);
+        var props = propertyNames
+            .Select(name => productType
+                .GetProperties()
+                .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+            .Where(p => p != null)
+            .ToList();
+
+        // Remove all rows except the first (label) row
+        for (int i = 1; i < rows.Count; i++)
         {
-            // Find the table that contains the placeholder
-            var table = tables.FirstOrDefault(t =>
-                t.Descendants<W.Text>().Any(txt => txt.Text.Contains(group.Key)));
+            rows[i].Remove();
+        }
 
-            if (table == null) continue;
-
-            // Find the row with the placeholder and remove it
-            var placeholderRow = table.Descendants<W.TableRow>()
-                .FirstOrDefault(r => r.InnerText.Contains(group.Key));
-
-            if (placeholderRow != null)
+        // Add data rows
+        foreach (var item in items)
+        {
+            var row = new W.TableRow();
+            foreach (var prop in props)
             {
-                table.RemoveChild(placeholderRow);
+                var value = prop.GetValue(item);
+                row.Append(CreateCell(value?.ToString()));
             }
-
-            // Insert new rows
-            foreach (var item in group.Items)
-            {
-                var newRow = new W.TableRow();
-                newRow.Append(CreateCell(item.Name));
-                newRow.Append(CreateCell(item.Quantity.ToString()));
-                table.Append(newRow);
-            }
+            table.Append(row);
         }
     }
 
