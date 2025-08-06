@@ -21,8 +21,7 @@ public class WordService
     {
         var products = new List<Product>
         {
-            new Product
-            {
+            new() {
                 ProductId = 1,
                 NameEn = "Laptop",
                 NameAr = "حاسوب محمول",
@@ -82,7 +81,7 @@ public class WordService
                     ReplacePlaceholders(header.Header, placeholders);
                     if (model.Logo != null)
                     {
-                        ReplaceLogoInHeader(wordDoc, header, model.Logo);
+                        ReplaceLogoInHeader(header, model.Logo);
                     }
                 }
 
@@ -98,6 +97,18 @@ public class WordService
                 wordDoc.MainDocumentPart.Document.Save();
 
 
+                // Generate XML file from the header
+                //var xmlHeaderPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "header.xml");
+                //var docHeaderPart = wordDoc.MainDocumentPart.HeaderParts.First();
+
+                //using (var reader = new StreamReader(docHeaderPart.GetStream(FileMode.Open, FileAccess.Read)))
+                //{
+                //    var xmlContent = reader.ReadToEnd();
+                //    File.WriteAllText(xmlHeaderPath, xmlContent);
+                //}
+
+
+                //  Generate XML file from the document
                 var xmlPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "document.xml");
                 var docPart = wordDoc.MainDocumentPart;
 
@@ -123,13 +134,13 @@ public class WordService
             {
                 if (text.Text.Contains(key))
                 {
-                    text.Text = text.Text.Replace(key, placeholders[key], StringComparison.OrdinalIgnoreCase);
+                    text.Text = text.Text.Replace(key, placeholders[key]);
                 }
             }
         }
     }
 
-    private void ReplaceLogoInHeader(WordprocessingDocument wordDoc, HeaderPart headerPart, IFormFile logoFile)
+    private void ReplaceLogoInHeader(HeaderPart headerPart, IFormFile logoFile)
     {
         // Find the "{Logo}" placeholder in the header
         var logoPlaceholder = headerPart.Header.Descendants<W.Text>()
@@ -297,12 +308,11 @@ public class WordService
             .ToList();
 
         // Map property names to actual Product properties
-        var productType = typeof(Product);
+        var productType = typeof(T);
+
         var props = propertyNames
-            .Select(name => productType
-                .GetProperties()
-                .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
-            .Where(p => p != null)
+            .Select(name => productType.GetProperties().FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+            //.Where(p => p != null)
             .ToList();
 
         // Remove all rows except the first (label) row
@@ -317,8 +327,15 @@ public class WordService
             var row = new W.TableRow();
             foreach (var prop in props)
             {
-                var value = prop.GetValue(item);
-                row.Append(CreateCell(value?.ToString()));
+                string value = string.Empty;
+
+                if (prop != null)
+                {
+                    var propValue = prop.GetValue(item);
+                    value = propValue?.ToString() ?? "";
+                }
+
+                row.Append(CreateCell(value));
             }
             table.Append(row);
         }
