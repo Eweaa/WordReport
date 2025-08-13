@@ -1,27 +1,22 @@
 ﻿using DocumentFormat.OpenXml;
-using DocumentFormat.OpenXml.Bibliography;
 using DocumentFormat.OpenXml.Drawing;
 using DocumentFormat.OpenXml.Drawing.Wordprocessing;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
-using Microsoft.AspNetCore.Routing.Template;
 using System.Drawing;
 using System.IO.Compression;
 using System.Text;
-using System.Xml;
-using System.Xml.Linq;
 using WordReport.Models;
 using WordReport.ViewModels;
 using A = DocumentFormat.OpenXml.Drawing;
 using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
 using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
 using W = DocumentFormat.OpenXml.Wordprocessing;
-//using GemBox.Document;
 
 namespace WordReport.Services;
 
-public class WordService
+public class NewWordService
 {
     public byte[] GenerateDocument(DocumentViewModel model, string templatePath)
     {
@@ -36,6 +31,17 @@ public class WordService
             mem.Write(byteArray, 0, byteArray.Length);
             using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(mem, true))
             {
+
+                var xmlPathBefore = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "documentBefore.xml");
+                var docPartBefore = wordDoc.MainDocumentPart;
+
+                using (var reader = new StreamReader(docPartBefore.GetStream(FileMode.Open, FileAccess.Read)))
+                {
+                    var xmlContent = reader.ReadToEnd();
+                    File.WriteAllText(xmlPathBefore, xmlContent);
+                }
+
+
                 //var placeholders = model.GetType()
                 //.GetProperties()
                 //.Where(p => p.PropertyType == typeof(string) || p.PropertyType.IsValueType)
@@ -46,24 +52,15 @@ public class WordService
 
                 var placeholders = new Dictionary<string, string>
                 {
-                    { "{For}", "The Great User" },
-                    { "{Subject}", "Important Subject" },
-                    { "{ProposalReference}", "No Proposal Reference" },
-                    { "{ProposalDate}", DateTime.Now.ToString("dd MMMM yyyy") },
-                    { "{ValidFor}", "7 Days" }
-                };
-
-                var bodyPlaceholders = new Dictionary<string, string>
-                {
-                    { "{For}", "The Great User" },
-                    { "{Company}", "SomeCompany" },
-                    { "{Location}", "Some Location" },
-                    { "{RoutineAnalysis}", "80 Days" },         
-                    { "{SubContractedParameters}", "70 Days" }  
+                    { "{{For}}", "The Great User" },
+                    { "{{Subject}}", "Important Subject" },
+                    { "{{ProposalReference}}", "No Proposal Reference" },
+                    { "{{ProposalDate}}", DateTime.Now.ToString("dd MMMM yyyy") },
+                    { "{{ValidFor}}", "7 Days" }
                 };
 
                 // Replace in body
-                //ReplacePlaceholders(wordDoc.MainDocumentPart.Document.Body, placeholders);
+                ReplacePlaceholders(wordDoc.MainDocumentPart.Document.Body, placeholders);
 
                 // Replace in headers and handle logo
                 //foreach (var header in wordDoc.MainDocumentPart.HeaderParts)
@@ -84,12 +81,6 @@ public class WordService
                 // Add rows to the table
                 //AddTableRows(wordDoc.MainDocumentPart.Document.Body, products);
 
-                //ReplacePlaceholdersFirstPage(wordDoc.MainDocumentPart.Document.Body, "{For}", "The Great User");
-                //ReplacePlaceholders1(wordDoc.MainDocumentPart.Document.Body, bodyPlaceholders);
-                //ReplacePlaceholders2(wordDoc.MainDocumentPart.Document.Body, bodyPlaceholders);
-
-                ReplacePlaceholders3(wordDoc.MainDocumentPart.Document.Body, bodyPlaceholders);
-                ReplacePlaceholdersInitialTable(wordDoc.MainDocumentPart.Document.Body, placeholders);
                 AddQuotationTableAfterTitle(wordDoc.MainDocumentPart.Document.Body, quotations);
                 AddTableRowsByIndex(wordDoc.MainDocumentPart.Document.Body, tests, 4);
 
@@ -111,149 +102,22 @@ public class WordService
                 //}
 
 
-                //  Generate XML file from the edited document
-                
-                //  NEEDS TO BE TESTED BEFORE DELETING CODE BENEATH IT
-                GenerateXmlFile(templatePath, wordDoc, "document");
+                //  Generate XML file from the document
+                var xmlPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "document.xml");
+                var docPart = wordDoc.MainDocumentPart;
 
-                //var xmlPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "document.xml");
-                //var docPart = wordDoc.MainDocumentPart;
-
-                //using (var reader = new StreamReader(docPart.GetStream(FileMode.Open, FileAccess.Read)))
-                //{
-                //    var xmlContent = reader.ReadToEnd();
-                //    File.WriteAllText(xmlPath, xmlContent);
-                //}
+                using (var reader = new StreamReader(docPart.GetStream(FileMode.Open, FileAccess.Read)))
+                {
+                    var xmlContent = reader.ReadToEnd();
+                    File.WriteAllText(xmlPath, xmlContent);
+                }
             }
 
             return mem.ToArray();
         }
     }
 
-    public void GenerateXmlFile(string templatePath, WordprocessingDocument wordDocument, string outputFileName)
-    {
-        var xmlPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), $"{outputFileName}.xml");
-        var docPart = wordDocument.MainDocumentPart;
-
-        using (var reader = new StreamReader(docPart.GetStream(FileMode.Open, FileAccess.Read)))
-        {
-            var xmlContent = reader.ReadToEnd();
-            File.WriteAllText(xmlPath, xmlContent);
-        }
-    }
-
-
-    //public byte[] GeneratePdfFromTemplate(string templatePath)
-    //{
-    //    var products = DataService.GetProducts();
-    //    var tests = DataService.GetTests();
-    //    var quotations = DataService.GetQuotations();
-
-    //    byte[] byteArray = File.ReadAllBytes(templatePath);
-
-    //    using (MemoryStream mem = new MemoryStream())
-    //    {
-    //        mem.Write(byteArray, 0, byteArray.Length);
-
-    //        // 1️⃣ Modify the DOCX in memory
-    //        using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(mem, true))
-    //        {
-    //            var placeholders = new Dictionary<string, string>
-    //            {
-    //                { "{{For}}", "The Great User" },
-    //                { "{{Subject}}", "Important Subject" },
-    //                { "{{ProposalReference}}", "No Proposal Reference" },
-    //                { "{{ProposalDate}}", DateTime.Now.ToString("dd MMMM yyyy") },
-    //                { "{{ValidFor}}", "7 Days" }
-    //            };
-
-    //            var bodyPlaceholders = new Dictionary<string, string>
-    //            {
-    //                { "{{For}}", "The Great User" },
-    //                { "{{Company}}", "SomeCompany" },
-    //                { "{{Location}}", "Some Location" },
-    //                { "{{RoutineAnalysis}}", "80 Days" },
-    //                { "{{SubcontractedParameters}}", "70 Days" }
-    //            };
-
-    //            ReplacePlaceholdersInitialTable(wordDoc.MainDocumentPart.Document.Body, placeholders);
-    //            AddQuotationTableAfterTitle(wordDoc.MainDocumentPart.Document.Body, quotations);
-    //            AddTableRowsByIndex(wordDoc.MainDocumentPart.Document.Body, tests, 4);
-
-    //            wordDoc.MainDocumentPart.Document.Save();
-
-    //            // Optional: Debugging - save XML
-    //            var xmlPath = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(templatePath), "document.xml");
-    //            var docPart = wordDoc.MainDocumentPart;
-
-    //            using (var reader = new StreamReader(docPart.GetStream(FileMode.Open, FileAccess.Read)))
-    //            {
-    //                var xmlContent = reader.ReadToEnd();
-    //                File.WriteAllText(xmlPath, xmlContent);
-    //            }
-    //        }
-
-    //        // 2️⃣ Convert the updated DOCX in memory to PDF using GemBox.Document
-    //        mem.Position = 0; // reset stream position before reading
-    //        var document = DocumentModel.Load(mem, GemBox.Document.LoadOptions.DocxDefault);
-
-    //        using (MemoryStream pdfStream = new MemoryStream())
-    //        {
-    //            document.Save(pdfStream, GemBox.Document.SaveOptions.PdfDefault);
-    //            return pdfStream.ToArray();
-    //        }
-    //    }
-    //}
-
-
-    public static void ReplacePlaceholdersInitialTable(OpenXmlElement element, Dictionary<string, string> placeholders)
-    {
-        if (element == null || placeholders == null || placeholders.Count == 0)
-            return;
-
-        var firstTable = element.Elements<W.Table>().FirstOrDefault();
-
-        if (firstTable == null)
-            return;
-
-        //foreach (var text in firstTable.Descendants<W.Text>())
-        //{
-        //    foreach (var kvp in placeholders)
-        //    {
-        //        if (!string.IsNullOrEmpty(text.Text) && text.Text.Contains(kvp.Key))
-        //        {
-        //            text.Text = text.Text.Replace(kvp.Key, kvp.Value ?? string.Empty);
-        //        }
-        //    }
-        //}
-
-
-        foreach (var para in firstTable.Descendants<W.Paragraph>())
-        {
-            var texts = para.Descendants<W.Text>().ToList();
-            if (!texts.Any()) continue;
-
-            // Combine all runs into a single string
-            string combinedText = string.Concat(texts.Select(t => t.Text));
-
-            // Replace all placeholders in the combined string
-            foreach (var kvp in placeholders)
-            {
-                combinedText = combinedText.Replace(kvp.Key, kvp.Value ?? string.Empty);
-            }
-
-            // Put the modified text back into the first <w:t> and clear the rest
-            texts.First().Text = combinedText;
-            for (int i = 1; i < texts.Count; i++)
-            {
-                texts[i].Text = string.Empty;
-            }
-        }
-    }
-
-
-
-    //private void replaceplaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
+    //private void ReplacePlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
     //{
     //    foreach (var text in element.Descendants<W.Text>())
     //    {
@@ -274,7 +138,10 @@ public class WordService
     //private void ReplacePlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
     //{
     //    // Get all text elements that are not inside tables
-    //    var texts = element.Descendants<W.Text>().Where(t => !t.Ancestors<W.Table>().Any()).ToList();
+    //    var texts = element
+    //        .Descendants<W.Text>()
+    //        .Where(t => !t.Ancestors<W.Table>().Any())
+    //        .ToList();
 
     //    if (!texts.Any()) return;
 
@@ -294,187 +161,6 @@ public class WordService
     //        texts[i].Text = string.Empty;
     //    }
     //}
-
-    private void ReplacePlaceholdersFirstPage(OpenXmlElement element, string Key, string Value)
-    {
-        var texts = element.Descendants<W.Text>().Where(t => !t.Ancestors<W.Table>().Any()).ToList();
-
-        foreach (var text in texts)
-        {
-            string originalText = text.Text;
-            originalText = originalText.Replace(Key, Value);
-            text.Text = originalText;
-        }
-    }
-
-    private void ReplacePlaceholders1(OpenXmlElement element, Dictionary<string, string> placeholders)
-    {
-        var texts = element.Descendants<W.Text>().Where(t => !t.Ancestors<W.Table>().Any()).ToList();
-
-        foreach (var text in texts)
-        {
-            string originalText = text.Text;
-            foreach (var kvp in placeholders)
-            {
-                originalText = originalText.Replace(kvp.Key, kvp.Value);
-            }
-            text.Text = originalText;
-        }
-    }
-
-    private void ReplacePlaceholders2(OpenXmlElement element, Dictionary<string, string> placeholders)
-    {
-        var paragraphs = element.Descendants<W.Paragraph>()
-        .Where(p => !p.Ancestors<W.Table>().Any()).ToList();
-
-        foreach (var paragraph in paragraphs)
-        {
-            var texts = paragraph.Descendants<W.Text>().ToList();
-            if (!texts.Any()) continue;
-
-            string combinedText = string.Join("", texts.Select(t => t.Text));
-
-            foreach (var kvp in placeholders)
-            {
-                combinedText = combinedText.Replace(kvp.Key, kvp.Value);
-            }
-
-            // Only modify if there are changes
-            if (texts.Count > 1 || texts[0].Text != combinedText)
-            {
-                texts[0].Text = combinedText;
-                for (int i = 1; i < texts.Count; i++)
-                {
-                    texts[i].Text = string.Empty;
-                }
-            }
-        }
-    }
-
-    private void ReplacePlaceholders3(OpenXmlElement element, Dictionary<string, string> placeholders)
-    {
-        // Get all paragraphs that are not inside tables
-        var paragraphs = element.Descendants<W.Paragraph>()
-            .Where(p => !p.Ancestors<W.Table>().Any())
-            .ToList();
-
-        foreach (var paragraph in paragraphs)
-        {
-            ReplacePlaceholdersInParagraph1(paragraph, placeholders);
-        }
-    }
-
-
-    // Don't Remove yet to Test
-    //private void ReplacePlaceholdersAdvanced(OpenXmlElement element, Dictionary<string, string> placeholders)
-    //{
-    //    var paragraphs = element.Descendants<W.Paragraph>()
-    //        .Where(p => !p.Ancestors<W.Table>().Any())
-    //        .ToList();
-
-    //    foreach (var paragraph in paragraphs)
-    //    {
-    //        // Check if this paragraph contains any placeholder
-    //        string fullText = paragraph.InnerText;
-    //        bool containsPlaceholder = placeholders.Keys.Any(key => fullText.Contains(key));
-
-    //        if (!containsPlaceholder)
-    //            continue;
-
-    //        // Try individual text replacement first
-    //        var texts = paragraph.Descendants<W.Text>().ToList();
-    //        bool simpleReplacementWorked = false;
-
-    //        foreach (var text in texts)
-    //        {
-    //            string originalText = text.Text;
-    //            string newText = originalText;
-
-    //            foreach (var kvp in placeholders)
-    //            {
-    //                newText = newText.Replace(kvp.Key, kvp.Value);
-    //            }
-
-    //            if (newText != originalText)
-    //            {
-    //                text.Text = newText;
-    //                simpleReplacementWorked = true;
-    //            }
-    //        }
-
-    //        // If simple replacement didn't work, use consolidation approach
-    //        if (!simpleReplacementWorked)
-    //        {
-    //            string combinedText = string.Join("", texts.Select(t => t.Text));
-    //            string processedText = combinedText;
-
-    //            foreach (var kvp in placeholders)
-    //            {
-    //                processedText = processedText.Replace(kvp.Key, kvp.Value);
-    //            }
-
-    //            if (processedText != combinedText)
-    //            {
-    //                texts[0].Text = processedText;
-    //                for (int i = 1; i < texts.Count; i++)
-    //                {
-    //                    texts[i].Text = string.Empty;
-    //                }
-    //            }
-    //        }
-    //    }
-    //}
-
-
-    private void ReplacePlaceholdersInParagraph1(W.Paragraph paragraph, Dictionary<string, string> placeholders)
-    {
-        var texts = paragraph.Descendants<W.Text>().ToList();
-        if (!texts.Any()) return;
-
-        // First, try simple replacement on individual text elements
-        bool anyReplaced = false;
-        foreach (var text in texts)
-        {
-            string originalText = text.Text;
-            string modifiedText = originalText;
-
-            foreach (var kvp in placeholders)
-            {
-                modifiedText = modifiedText.Replace(kvp.Key, kvp.Value);
-            }
-
-            if (modifiedText != originalText)
-            {
-                text.Text = modifiedText;
-                anyReplaced = true;
-            }
-        }
-
-        // If simple replacement worked, we're done
-        if (anyReplaced)
-            return;
-
-        // If no simple replacement worked, check if we need to consolidate text
-        // (this handles cases where placeholders are split across multiple text elements)
-        string combinedText = string.Join("", texts.Select(t => t.Text));
-        string processedText = combinedText;
-
-        foreach (var kvp in placeholders)
-        {
-            processedText = processedText.Replace(kvp.Key, kvp.Value);
-        }
-
-        // Only consolidate if replacement actually occurred
-        if (processedText != combinedText)
-        {
-            // Consolidate text into first element, clear others
-            texts[0].Text = processedText;
-            for (int i = 1; i < texts.Count; i++)
-            {
-                texts[i].Text = string.Empty;
-            }
-        }
-    }
 
     private void ReplaceLogoInHeader(HeaderPart headerPart, IFormFile logoFile)
     {
@@ -807,8 +493,12 @@ public class WordService
     private void AddQuotationTableAfterTitle(W.Body body, Quotation quotation)
     {
         // Find the Title Quotation
-        var titleParagraph = body.Descendants<W.Paragraph>()
-        .FirstOrDefault(p => p.InnerText.Trim().Equals("Quotation", StringComparison.OrdinalIgnoreCase) && p.Ancestors<W.Table>().Count() == 0);
+        var titleParagraph = body
+        .Descendants<W.Paragraph>()
+        .FirstOrDefault(p =>
+            p.InnerText.Trim().Equals("Quotation", StringComparison.OrdinalIgnoreCase) &&
+            p.Ancestors<W.Table>().Count() == 0
+        );
 
         if (titleParagraph == null)
             throw new InvalidOperationException("No 'Quotation' title found in the document.");
@@ -839,12 +529,12 @@ public class WordService
             subtotal += total;
 
             var row = new W.TableRow();
-            row.Append(CreateCenteredCell(index.ToString("00")));       
-            row.Append(CreateCenteredCell(item.Deliverable ?? ""));     
-            row.Append(CreateCenteredCell(item.Unit ?? ""));            
-            row.Append(CreateCenteredCell(unitCost.ToString("N2")));    
-            row.Append(CreateCenteredCell(qty.ToString()));             
-            row.Append(CreateCenteredCell(total.ToString("N2")));       
+            row.Append(CreateCenteredCell(index.ToString("00")));          // No.
+            row.Append(CreateCenteredCell(item.Deliverable ?? ""));        // Deliverable
+            row.Append(CreateCenteredCell(item.Unit ?? ""));               // Unit
+            row.Append(CreateCenteredCell(unitCost.ToString("N2")));       // Unit Cost
+            row.Append(CreateCenteredCell(qty.ToString()));                // Qty
+            row.Append(CreateCenteredCell(total.ToString("N2")));          // Total Cost
             table.Append(row);
             index++;
         }
@@ -1015,55 +705,55 @@ public class WordService
     //    }
     //}
 
-    private void ReplacePlaceholdersInParagraph(W.Paragraph paragraph, Dictionary<string, string> placeholders)
-    {
-        // Get all text content from the paragraph
-        string paragraphText = GetParagraphText(paragraph);
+    //private void ReplacePlaceholdersInParagraph(W.Paragraph paragraph, Dictionary<string, string> placeholders)
+    //{
+    //    // Get all text content from the paragraph
+    //    string paragraphText = GetParagraphText(paragraph);
 
-        // Check if any placeholder exists in the paragraph
-        bool hasReplacements = false;
-        string modifiedText = paragraphText;
+    //    // Check if any placeholder exists in the paragraph
+    //    bool hasReplacements = false;
+    //    string modifiedText = paragraphText;
 
-        foreach (var kvp in placeholders)
-        {
-            if (modifiedText.Contains(kvp.Key))
-            {
-                modifiedText = modifiedText.Replace(kvp.Key, kvp.Value);
-                hasReplacements = true;
-            }
-        }
+    //    foreach (var kvp in placeholders)
+    //    {
+    //        if (modifiedText.Contains(kvp.Key))
+    //        {
+    //            modifiedText = modifiedText.Replace(kvp.Key, kvp.Value);
+    //            hasReplacements = true;
+    //        }
+    //    }
 
-        // If no replacements needed, return early
-        if (!hasReplacements)
-            return;
+    //    // If no replacements needed, return early
+    //    if (!hasReplacements)
+    //        return;
 
-        // Get the first run's formatting to preserve style
-        var firstRun = paragraph.Descendants<W.Run>().FirstOrDefault();
-        var runProperties = firstRun?.RunProperties?.CloneNode(true) as W.RunProperties;
+    //    // Get the first run's formatting to preserve style
+    //    var firstRun = paragraph.Descendants<W.Run>().FirstOrDefault();
+    //    var runProperties = firstRun?.RunProperties?.CloneNode(true) as W.RunProperties;
 
-        // Clear all existing runs
-        paragraph.RemoveAllChildren<W.Run>();
+    //    // Clear all existing runs
+    //    paragraph.RemoveAllChildren<W.Run>();
 
-        // Create a new run with the modified text and original formatting
-        var newRun = new W.Run();
-        if (runProperties != null)
-            newRun.RunProperties = runProperties;
+    //    // Create a new run with the modified text and original formatting
+    //    var newRun = new W.Run();
+    //    if (runProperties != null)
+    //        newRun.RunProperties = runProperties;
 
-        newRun.AppendChild(new W.Text(modifiedText) { Space = SpaceProcessingModeValues.Preserve });
-        paragraph.AppendChild(newRun);
-    }
+    //    newRun.AppendChild(new W.Text(modifiedText) { Space = SpaceProcessingModeValues.Preserve });
+    //    paragraph.AppendChild(newRun);
+    //}
 
-    private string GetParagraphText(W.Paragraph paragraph)
-    {
-        var textBuilder = new StringBuilder();
+    //private string GetParagraphText(W.Paragraph paragraph)
+    //{
+    //    var textBuilder = new StringBuilder();
 
-        foreach (var text in paragraph.Descendants<W.Text>())
-        {
-            textBuilder.Append(text.Text);
-        }
+    //    foreach (var text in paragraph.Descendants<W.Text>())
+    //    {
+    //        textBuilder.Append(text.Text);
+    //    }
 
-        return textBuilder.ToString();
-    }
+    //    return textBuilder.ToString();
+    //}
 
     // Alternative approach that preserves more complex formatting
     private void ReplacePlaceholdersAdvanced(OpenXmlElement element, Dictionary<string, string> placeholders)
@@ -1194,5 +884,196 @@ public class WordService
         return result;
     }
 
+
+
+    private void ReplacePlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
+    {
+        // Process paragraphs in the main document body (outside tables)
+        foreach (var paragraph in element.Descendants<W.Paragraph>().Where(p => !p.Ancestors<W.Table>().Any()))
+        {
+            ReplacePlaceholdersInParagraph(paragraph, placeholders);
+        }
+
+        // Process paragraphs in tables (first table only, or all tables as needed)
+        ProcessTablesPlaceholders(element, placeholders);
+
+        // Process paragraphs in text boxes and other drawing elements
+        ProcessDrawingElementsPlaceholders(element, placeholders);
+    }
+
+    private void ProcessTablesPlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
+    {
+        // Get the first table only (adjust logic if you need to process all tables)
+        var firstTable = element.Descendants<W.Table>().FirstOrDefault();
+        if (firstTable != null)
+        {
+            foreach (var paragraph in firstTable.Descendants<W.Paragraph>())
+            {
+                ReplacePlaceholdersInParagraph(paragraph, placeholders);
+            }
+        }
+
+        // If you want to process ALL tables instead of just the first one, use this:
+        /*
+        foreach (var table in element.Descendants<W.Table>())
+        {
+            foreach (var paragraph in table.Descendants<W.Paragraph>())
+            {
+                ReplacePlaceholdersInParagraph(paragraph, placeholders);
+            }
+        }
+        */
+    }
+
+    private void ProcessDrawingElementsPlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
+    {
+        // Process text boxes in drawings (like in your XML example)
+        foreach (var textBox in element.Descendants<W.Drawing>())
+        {
+            // Handle both modern drawing format and legacy VML format
+            var textBoxContent = textBox.Descendants().Where(e =>
+                e.LocalName == "txbxContent" &&
+                (e.NamespaceUri == "http://schemas.openxmlformats.org/wordprocessingml/2006/main" ||
+                 e.NamespaceUri.Contains("office")));
+
+            foreach (var content in textBoxContent)
+            {
+                foreach (var paragraph in content.Descendants<W.Paragraph>())
+                {
+                    ReplacePlaceholdersInParagraph(paragraph, placeholders);
+                }
+            }
+        }
+
+        // Handle VML text boxes (legacy format like v:textbox in your XML)
+        var vmlNamespace = "urn:schemas-microsoft-com:vml";
+        foreach (var vmlElement in element.Descendants().Where(e => e.NamespaceUri == vmlNamespace))
+        {
+            foreach (var paragraph in vmlElement.Descendants<W.Paragraph>())
+            {
+                ReplacePlaceholdersInParagraph(paragraph, placeholders);
+            }
+        }
+    }
+
+    private void ReplacePlaceholdersInParagraph(W.Paragraph paragraph, Dictionary<string, string> placeholders)
+    {
+        // Get all text content from the paragraph
+        string paragraphText = GetParagraphText(paragraph);
+
+        // Check if any placeholder exists in the paragraph
+        bool hasReplacements = false;
+        string modifiedText = paragraphText;
+
+        foreach (var kvp in placeholders)
+        {
+            if (modifiedText.Contains(kvp.Key))
+            {
+                modifiedText = modifiedText.Replace(kvp.Key, kvp.Value);
+                hasReplacements = true;
+            }
+        }
+
+        // If no replacements needed, return early
+        if (!hasReplacements)
+            return;
+
+        // Get the first run's formatting to preserve style
+        var firstRun = paragraph.Descendants<W.Run>().FirstOrDefault();
+        var runProperties = firstRun?.RunProperties?.CloneNode(true) as W.RunProperties;
+
+        // Clear all existing runs
+        var runsToRemove = paragraph.Descendants<W.Run>().ToList();
+        foreach (var run in runsToRemove)
+        {
+            run.Remove();
+        }
+
+        // Create a new run with the modified text and original formatting
+        var newRun = new W.Run();
+        if (runProperties != null)
+            newRun.RunProperties = runProperties;
+
+        newRun.AppendChild(new W.Text(modifiedText) { Space = SpaceProcessingModeValues.Preserve });
+        paragraph.AppendChild(newRun);
+    }
+
+    private string GetParagraphText(W.Paragraph paragraph)
+    {
+        var textBuilder = new StringBuilder();
+
+        foreach (var text in paragraph.Descendants<W.Text>())
+        {
+            textBuilder.Append(text.Text);
+        }
+
+        return textBuilder.ToString();
+    }
+
+    // Alternative comprehensive method that handles all scenarios in one go
+    private void ReplacePlaceholdersComprehensive(OpenXmlElement element, Dictionary<string, string> placeholders)
+    {
+        // Get all paragraphs from all locations (main document, tables, text boxes, etc.)
+        var allParagraphs = GetAllParagraphs(element);
+
+        foreach (var paragraph in allParagraphs)
+        {
+            ReplacePlaceholdersInParagraph(paragraph, placeholders);
+        }
+    }
+
+    private IEnumerable<W.Paragraph> GetAllParagraphs(OpenXmlElement element)
+    {
+        var paragraphs = new List<W.Paragraph>();
+
+        // Main document paragraphs (outside tables)
+        paragraphs.AddRange(element.Descendants<W.Paragraph>().Where(p => !p.Ancestors<W.Table>().Any()));
+
+        // Table paragraphs (first table only - modify as needed)
+        var firstTable = element.Descendants<W.Table>().FirstOrDefault();
+        if (firstTable != null)
+        {
+            paragraphs.AddRange(firstTable.Descendants<W.Paragraph>());
+        }
+
+        // Drawing/TextBox paragraphs
+        foreach (var drawing in element.Descendants<W.Drawing>())
+        {
+            paragraphs.AddRange(drawing.Descendants<W.Paragraph>());
+        }
+
+        // VML TextBox paragraphs (legacy format)
+        var vmlNamespace = "urn:schemas-microsoft-com:vml";
+        foreach (var vmlElement in element.Descendants().Where(e => e.NamespaceUri == vmlNamespace))
+        {
+            paragraphs.AddRange(vmlElement.Descendants<W.Paragraph>());
+        }
+
+        // Header/Footer paragraphs if needed
+        foreach (var headerFooter in element.Descendants().Where(e =>
+            e.LocalName == "hdr" || e.LocalName == "ftr"))
+        {
+            paragraphs.AddRange(headerFooter.Descendants<W.Paragraph>());
+        }
+
+        return paragraphs;
+    }
+
+    // Utility method to safely handle null placeholders
+    private void ReplacePlaceholdersSafe(OpenXmlElement element, Dictionary<string, string> placeholders)
+    {
+        if (element == null || placeholders == null || !placeholders.Any())
+            return;
+
+        // Filter out null or empty keys/values
+        var safePlaceholders = placeholders
+            .Where(kvp => !string.IsNullOrEmpty(kvp.Key) && kvp.Value != null)
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+        if (safePlaceholders.Any())
+        {
+            ReplacePlaceholdersComprehensive(element, safePlaceholders);
+        }
+    }
 
 }

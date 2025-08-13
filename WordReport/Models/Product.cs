@@ -1,4 +1,6 @@
-﻿namespace WordReport.Models;
+﻿using DocumentFormat.OpenXml.Office2013.Word;
+
+namespace WordReport.Models;
 
 public class Product
 {
