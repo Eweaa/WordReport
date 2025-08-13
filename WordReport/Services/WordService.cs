@@ -6,6 +6,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Microsoft.AspNetCore.Routing.Template;
+using System.Diagnostics;
 using System.Drawing;
 using System.IO.Compression;
 using System.Text;
@@ -127,7 +128,115 @@ public class WordService
             }
 
             return mem.ToArray();
+
         }
+    }
+
+    public byte[] GenerateProposalPdfWithLibreOffice(DocumentViewModel model, string templatePath)
+    {
+        // Create a temp working folder
+        string tempDir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+
+        // Paths for the DOCX and final PDF
+        string editedDocxPath = System.IO.Path.Combine(tempDir, "proposal.docx");
+
+        // Copy template so we don't overwrite the original
+        File.Copy(templatePath, editedDocxPath, true);
+
+        // Edit Word File
+        using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(editedDocxPath, true))
+        {
+            var products = DataService.GetProducts();
+            var tests = DataService.GetTests();
+            var quotations = DataService.GetQuotations();
+
+            var placeholders = new Dictionary<string, string>
+            {
+                { "{For}", "The Great User" },
+                { "{Subject}", "Important Subject" },
+                { "{ProposalReference}", "No Proposal Reference" },
+                { "{ProposalDate}", DateTime.Now.ToString("dd MMMM yyyy") },
+                { "{ValidFor}", "7 Days" }
+            };
+
+            var bodyPlaceholders = new Dictionary<string, string>
+            {
+                { "{For}", "The Great User" },
+                { "{Company}", "SomeCompany" },
+                { "{Location}", "Some Location" },
+                { "{RoutineAnalysis}", "80 Days" },
+                { "{SubContractedParameters}", "70 Days" }
+            };
+
+            // Replace in body
+            ReplacePlaceholders3(wordDoc.MainDocumentPart.Document.Body, bodyPlaceholders);
+            ReplacePlaceholdersInitialTable(wordDoc.MainDocumentPart.Document.Body, placeholders);
+
+            // Add tables
+            AddQuotationTableAfterTitle(wordDoc.MainDocumentPart.Document.Body, quotations);
+            AddTableRowsByIndex(wordDoc.MainDocumentPart.Document.Body, tests, 4);
+
+            // Save changes
+            wordDoc.MainDocumentPart.Document.Save();
+
+
+            // Generate XML file for the edited word file
+            GenerateXmlFile(templatePath, wordDoc, "document");
+        }
+
+        // Convert Word to PDF
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "soffice",
+            Arguments = $"--headless --convert-to pdf --outdir \"{tempDir}\" \"{editedDocxPath}\"",
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        string stdOut, stdErr;
+        using (var process = Process.Start(processInfo))
+        {
+            stdOut = process.StandardOutput.ReadToEnd();
+            stdErr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+        }
+
+        Console.WriteLine("LibreOffice Output:");
+        Console.WriteLine(stdOut);
+        Console.WriteLine("LibreOffice Error:");
+        Console.WriteLine(stdErr);
+
+        // Wait for PDF to appear
+        string pdfPath = null;
+        for (int i = 0; i < 10; i++) // Try up to ~5 seconds
+        {
+            pdfPath = Directory.GetFiles(tempDir, "*.pdf").FirstOrDefault();
+            if (pdfPath != null && File.Exists(pdfPath))
+                break;
+
+            Thread.Sleep(500);
+        }
+
+        if (pdfPath == null || !File.Exists(pdfPath))
+            throw new FileNotFoundException("LibreOffice did not create a PDF file.", pdfPath ?? "(unknown)");
+
+        // Read PDF into byte array
+        byte[] pdfBytes = File.ReadAllBytes(pdfPath);
+
+        // Clean up
+        try { Directory.Delete(tempDir, true); } catch { }
+
+        return pdfBytes;
+    }
+
+    // Example document generation stub
+    private void GenerateWordDocumentFromTemplate(DocumentViewModel model, string templatePath, string outputPath)
+    {
+        // TODO: Fill DOCX generation logic here
+        File.Copy(templatePath, outputPath, true);
     }
 
     public void GenerateXmlFile(string templatePath, WordprocessingDocument wordDocument, string outputFileName)
@@ -431,7 +540,7 @@ public class WordService
         var texts = paragraph.Descendants<W.Text>().ToList();
         if (!texts.Any()) return;
 
-        // First, try simple replacement on individual text elements
+        // First => Simple Replace If The Entire Key is in One Tag
         bool anyReplaced = false;
         foreach (var text in texts)
         {
@@ -450,12 +559,12 @@ public class WordService
             }
         }
 
-        // If simple replacement worked, we're done
+        // If Simple Replace Worked Thank You Very Much and سلامو عليكوا
         if (anyReplaced)
             return;
 
-        // If no simple replacement worked, check if we need to consolidate text
-        // (this handles cases where placeholders are split across multiple text elements)
+
+        // If Simple Replce Didn't Work We Need To Try Complex Replace (Where The Key Is Split Across Different Tags)
         string combinedText = string.Join("", texts.Select(t => t.Text));
         string processedText = combinedText;
 
@@ -464,10 +573,10 @@ public class WordService
             processedText = processedText.Replace(kvp.Key, kvp.Value);
         }
 
-        // Only consolidate if replacement actually occurred
+        // If Something Is Replaced
         if (processedText != combinedText)
         {
-            // Consolidate text into first element, clear others
+            // Combine The Text into The First Element & Make The Rest Empty
             texts[0].Text = processedText;
             for (int i = 1; i < texts.Count; i++)
             {
@@ -742,7 +851,7 @@ public class WordService
         // Map each property name to its PropertyInfo (or null if not found)
         var props = propertyNames
             .Select(name => typeof(T).GetProperties()
-                .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
+            .FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         // Remove old data rows
