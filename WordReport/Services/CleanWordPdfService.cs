@@ -11,7 +11,7 @@ public class CleanWordPdfService
 {
     public byte[] GenerateProposalPdfWithLibreOffice(DocumentViewModel model, string templatePath)
     {
-        // Create a temp working folder
+        // Create A Temp Working Folder
         string tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
         Directory.CreateDirectory(tempDir);
 
@@ -24,6 +24,8 @@ public class CleanWordPdfService
         // Edit Word File
         using (WordprocessingDocument wordDoc = WordprocessingDocument.Open(editedDocxPath, true))
         {
+
+            // Getting The Data (In-Memory)
             var products = DataService.GetProducts();
             var tests = DataService.GetTests();
             var quotations = DataService.GetQuotations();
@@ -55,11 +57,21 @@ public class CleanWordPdfService
             // Save changes
             wordDoc.MainDocumentPart.Document.Save();
 
-            // Generate XML file for the edited word file
+            // Generate XML File for The Edited Word File
             GenerateXmlFile(templatePath, wordDoc, "document");
         }
 
+
+
         // Convert Word to PDF
+        // VERY VERY VERY VERY IMPORTANT NOTE:
+        // For this to work, you need to have LibreOffice installed and available in your system's PATH (Add it to Environment Varaible).
+        // Ensure LibreOffice is installed and available in PATH
+        // You May Need to Close The Terminal if it's open and Close Visual Studio if it's open
+        // Run soffice -- version in the terminal to check if it's available
+        // Restart the Computer if it's not showing in Terminal
+        // Then Run This Code & It Should Generate The PDF File
+        // قول يا رب
         var processInfo = new ProcessStartInfo
         {
             FileName = "soffice",
@@ -78,12 +90,15 @@ public class CleanWordPdfService
             process.WaitForExit();
         }
 
+
+        // Debugging Code عدي يا معلم متركزش معاه إلا لو الكود ضرب
         Console.WriteLine("LibreOffice Output:");
         Console.WriteLine(stdOut);
         Console.WriteLine("LibreOffice Error:");
         Console.WriteLine(stdErr);
 
         // Wait for PDF to appear
+        // This Used to Fail Sometimes Because LibreOffice Takes Time to Generate the PDF
         string pdfPath = null;
         for (int i = 0; i < 10; i++) // Try up to ~5 seconds
         {
@@ -106,7 +121,12 @@ public class CleanWordPdfService
         return pdfBytes;
     }
 
-
+    /// <summary>
+    /// Generates an XML file from the Word document.
+    /// </summary>
+    /// <param name="templatePath">The Folder Path That The XML File Will Be Saved in</param>
+    /// <param name="wordDocument">The Word Document That is Going to Be Transformed Into XML</param>
+    /// <param name="outputFileName">The Output File Name -- Don't Add Extension Just The Name. The Method Will Add The Extension</param>
     public void GenerateXmlFile(string templatePath, WordprocessingDocument wordDocument, string outputFileName)
     {
         var xmlPath = Path.Combine(Path.GetDirectoryName(templatePath), $"{outputFileName}.xml");
@@ -119,6 +139,11 @@ public class CleanWordPdfService
         }
     }
 
+    /// <summary>
+    /// Replaces Keys in The Word Document Body Not The Tables
+    /// </summary>
+    /// <param name="element">The Element That is Going to Be Searched</param>
+    /// <param name="placeholders">The Keys and The Values</param>
     private void ReplacePlaceholders(OpenXmlElement element, Dictionary<string, string> placeholders)
     {
         // Get all paragraphs that are not inside tables
@@ -131,6 +156,7 @@ public class CleanWordPdfService
             ReplacePlaceholdersInParagraph(paragraph, placeholders);
         }
     }
+
 
     private void ReplacePlaceholdersInParagraph(W.Paragraph paragraph, Dictionary<string, string> placeholders)
     {
@@ -182,6 +208,12 @@ public class CleanWordPdfService
         }
     }
 
+
+    /// <summary>
+    /// Replaces Keys in The First Table of The Word Document Body
+    /// </summary>
+    /// <param name="element">The Element That is Going to Be Searched</param>
+    /// <param name="placeholders">The Keys and The Values</param>
     public static void ReplacePlaceholdersInitialTable(OpenXmlElement element, Dictionary<string, string> placeholders)
     {
         if (element == null || placeholders == null || placeholders.Count == 0)
@@ -197,10 +229,10 @@ public class CleanWordPdfService
             var texts = para.Descendants<W.Text>().ToList();
             if (!texts.Any()) continue;
 
-            // Combine all runs into a single string
+            // Combine All Runs into One String
             string combinedText = string.Concat(texts.Select(t => t.Text));
 
-            // Replace all placeholders in the combined string
+            // Replace All Placeholders in The Combined String
             foreach (var kvp in placeholders)
             {
                 combinedText = combinedText.Replace(kvp.Key, kvp.Value ?? string.Empty);
@@ -215,6 +247,14 @@ public class CleanWordPdfService
         }
     }
 
+    /// <summary>
+    /// The Method Finds The Table By Index and Adds Rows to It
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="body"></param>
+    /// <param name="items"></param>
+    /// <param name="tableIndex"></param>
+    /// <exception cref="InvalidOperationException"></exception>
     private void AddTableRowsByIndex<T>(W.Body body, List<T> items, int tableIndex)
     {
         if (items == null || items.Count == 0) return;
@@ -232,6 +272,13 @@ public class CleanWordPdfService
         PopulateTableWithItems(table, items);
     }
 
+
+    /// <summary>
+    /// The Most Important Method That Populates The Table With Items. Works For Now
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <param name="table"></param>
+    /// <param name="items"></param>
     private void PopulateTableWithItems<T>(W.Table table, List<T> items)
     {
         var rows = table.Elements<W.TableRow>().ToList();
@@ -284,6 +331,11 @@ public class CleanWordPdfService
         }
     }
 
+    /// <summary>
+    /// Adds A Cell to The Table
+    /// </summary>
+    /// <param name="text"></param>
+    /// <returns></returns>
     private W.TableCell CreateCell(string text)
     {
         return new W.TableCell(
@@ -295,6 +347,12 @@ public class CleanWordPdfService
         );
     }
 
+
+    /// <summary>
+    /// Add A Cell to The Table With Centered Text
+    /// </summary>
+    /// <param name="text"></param>
+    /// <returns></returns>
     private W.TableCell CreateCenteredCell(string text)
     {
         return new W.TableCell(
@@ -312,8 +370,19 @@ public class CleanWordPdfService
         );
     }
 
+
+
+    /// <summary>
+    /// This Method Searches For The Table That Contains The Quotation Title
+    /// </summary>
+    /// <param name="body">Takes The Element That Is Going to Be Searched</param>
+    /// <param name="quotation">Takes The Data That is Going to Be Used</param>
+    /// <exception cref="InvalidOperationException"></exception>
     private void AddQuotationTableAfterTitle(W.Body body, Quotation quotation)
     {
+        // Can Be Updated To Take The Title as A Parameter And Search For It
+
+
         // Find the Title Quotation
         var titleParagraph = body.Descendants<W.Paragraph>()
         .FirstOrDefault(p => p.InnerText.Trim().Equals("Quotation", StringComparison.OrdinalIgnoreCase) && p.Ancestors<W.Table>().Count() == 0);
@@ -370,6 +439,15 @@ public class CleanWordPdfService
         table.Append(CreateSummaryRow("Total", quotation.FinalTotal ?? 0, 5, bold: true));
     }
 
+
+    /// <summary>
+    /// Adds A Cell to The Table That Is Spanned Across Multiple Columns
+    /// </summary>
+    /// <param name="label"></param>
+    /// <param name="amount"></param>
+    /// <param name="mergeColumns"></param>
+    /// <param name="bold"></param>
+    /// <returns></returns>
     private W.TableRow CreateSummaryRow(string label, decimal amount, int mergeColumns, bool bold = false)
     {
         var row = new W.TableRow();
@@ -383,6 +461,14 @@ public class CleanWordPdfService
         return row;
     }
 
+
+    /// <summary>
+    /// Overloaded Method to Create A Cell with Text, Bold Option, and Colspan
+    /// </summary>
+    /// <param name="text"></param>
+    /// <param name="bold"></param>
+    /// <param name="colspan"></param>
+    /// <returns></returns>
     private W.TableCell CreateCell(string text, bool bold = false, int colspan = 1)
     {
         // Create run
@@ -413,6 +499,11 @@ public class CleanWordPdfService
         return cell;
     }
 
+
+    /// <summary>
+    /// Add Borders to The Table
+    /// </summary>
+    /// <param name="table"></param>
     private void ApplyTableBorders(W.Table table)
     {
         var tblBorders = new W.TableBorders(
